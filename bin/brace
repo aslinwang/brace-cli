@@ -36,9 +36,11 @@ function compare() {
   var cdndir = cwd + '/' + config.tmpdir + '/compare/cdn'; 
   del.sync([localdir, cdndir]);
 
-  // return
+
+  var count = 0;
   for (var key in local) {
     if (local[key] != cdn[key]) {
+      count++;
       (function(_key){
         var ext = path.extname(cdn[_key]);
         var f1, f2;
@@ -102,6 +104,9 @@ function compare() {
         })
       })(key);
     }
+  }
+  if (count == 0) {
+    console.log('两vers.json文件没有差异~');
   }
 }
 
