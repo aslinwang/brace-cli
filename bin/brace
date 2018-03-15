@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+'use strict'
+
+var cmd = require('commander');
+var fs = require('fs');
+var path = require('path');
+var del = require('del');
+
+var http = require('http');
+var mkdirp = require('mkdirp');
+var beautify_js = require('js-beautify').js;
+var beautify_css = require('js-beautify').css;
+
+var brace = require('../index.js');
+
+var cwd = process.cwd();
+var config = require(cwd + '/.brace.json'); // 获取.brace.json配置文件
+
+cmd.version('0.1.1')
+  .option('-c, --compare', 'compare static version')
+  .parse(process.argv);
+
+// 比较本地静态资源与cdn的区别
+if(cmd.compare) {
+  compare();
+}
+
+function compare() {
+  var localVer = config.compare.local;
+  var cdnVer = config.compare.cdn;
+
+  var local = require(cwd + '/' + localVer);
+  var cdn = require(cwd + '/' + cdnVer)
+
+  var localdir = cwd + '/' + config.tmpdir + '/compare/local';
+  var cdndir = cwd + '/' + config.tmpdir + '/compare/cdn'; 
+  del.sync([localdir, cdndir]);
+
+  // return
+  for (var key in local) {
+    if (local[key] != cdn[key]) {
+      (function(_key){
+        var ext = path.extname(cdn[_key]);
+        var f1, f2;
+        if (ext == '.js') { // js文件
+          f1 = config.compare.cdnprefix + 'js/' + local[_key];
+          f2 = config.compare.cdnprefix + 'js/' + cdn[_key];
+        }
+        else if(ext == '.css') { // css文件
+          f1 = config.compare.cdnprefix + 'css/' + local[_key];
+          f2 = config.compare.cdnprefix + 'css/' + cdn[_key];
+        }
+        http.get(f1, res => {
+          var file = localdir + '/' + local[_key];
+          file = file.replace(/-[a-z0-9A-Z]+\./, '.');
+
+          mkdirp(localdir, () => {
+            var data = '';
+            res.setEncoding('utf8');
+            res.on('data', chunk => {
+              data += chunk;
+            })
+            res.on('end', () => {
+              var content = ''
+              if (ext == '.js') {
+                content = beautify_js(data);
+              }
+              else if (ext == '.css') {
+                content = beautify_css(data);
+              }
+              fs.writeFile(file, content, 'utf8', () => {
+                console.log(file, '------done');
+              });
+              // console.log(f1, '------done');
+            })
+          })
+        })
+
+        http.get(f2, res => {
+          var file = cdndir + '/' + cdn[_key];
+          file = file.replace(/-[a-z0-9A-Z]+\./, '.');
+
+          mkdirp(cdndir, () => {
+            var data = '';
+            res.setEncoding('utf8');
+            res.on('data', chunk => {
+              data += chunk;
+            })
+            res.on('end', () => {
+              var content = ''
+              if (ext == '.js') {
+                content = beautify_js(data);
+              }
+              else if (ext == '.css') {
+                content = beautify_css(data);
+              }
+              fs.writeFile(file, content, 'utf8', () => {
+                console.log(file, '------done');
+              });
+            })
+          })
+        })
+      })(key);
+    }
+  }
+}
+
+
+// fs.readdir(cwd, function(err, files){
+//   files = files.filter(function(file){
+//     var stat = fs.lstatSync(file);
+//     if(stat.isDirectory()){
+//       return false;  
+//     }
+//     else{
+//       return true;
+//     }
+//   });
+//   var exec = function(){
+//     var file = files.shift();
+//     if(!file){
+//       return;
+//     }
+//     else{
+//     }
+//   }
+
+//   exec();
+// });
